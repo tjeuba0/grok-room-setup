@@ -3,11 +3,8 @@
 ## Tracked canonical files
 
 ```text
-~/.config/codex-room/model-instructions.md
 ~/.config/codex-room/overlays/*.config.toml
 ~/.config/codex-room/workflow/*.md
-~/.local/bin/codex-room
-~/.local/bin/codex-room-sync
 ~/.local/bin/grok-room
 ~/.local/bin/grok-room-sync
 ~/.local/bin/paseo -> ~/projects/supervisors/paseo-grok-room/packages/cli/bin/paseo

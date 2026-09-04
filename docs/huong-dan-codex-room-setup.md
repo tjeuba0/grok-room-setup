@@ -1,10 +1,12 @@
-# Hiểu toàn bộ `codex-room-setup` từ gốc đến ngọn
+# Hiểu toàn bộ Grok Room setup từ gốc đến ngọn
 
-Tài liệu này dành cho người mới tiếp cận `codex-room-setup`. Mục tiêu không chỉ là giúp bạn chạy được bộ công cụ, mà còn giúp bạn hiểu **thành phần nào chịu trách nhiệm cho việc gì**, một thay đổi đi qua hệ thống ra sao, và nên điều chỉnh ở đâu khi muốn áp dụng cho nhu cầu riêng.
+> Runtime hiện tại là **Grok + Paseo official**. Cài và kiểm tra theo [README.md](../README.md). Các đoạn dưới đây còn mô tả kiến trúc room (overlay, bốn vai, Paseo điều phối). Chỗ nào ghi Codex launcher/`CODEX_HOME` thì bản live tương ứng là `grok-room` / `GROK_HOME=~/.grok-runtime/<role>`.
+
+Tài liệu này dành cho người mới tiếp cận repo. Mục tiêu không chỉ là giúp bạn chạy được bộ công cụ, mà còn giúp bạn hiểu **thành phần nào chịu trách nhiệm cho việc gì**, một thay đổi đi qua hệ thống ra sao, và nên điều chỉnh ở đâu khi muốn áp dụng cho nhu cầu riêng.
 
 ## 1. Bức tranh ngắn gọn nhất
 
-`codex-room-setup` tạo một “phòng làm việc” gồm bốn vai trò Codex:
+Repo này tạo một “phòng làm việc” gồm bốn vai trò Grok:
 
 | Vai trò | Trách nhiệm cốt lõi | Có công cụ điều phối Paseo |
 | --- | --- | --- |

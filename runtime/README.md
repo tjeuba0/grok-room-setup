@@ -1,15 +1,12 @@
 # Runtime
 
-The runtime is generated at `~/.codex-runtime`, not installed from Git.
-
-Expected top-level roles:
+Runtime được sinh tại `~/.grok-runtime`, không cài từ Git.
 
 ```text
-~/.codex-runtime/supervisor
-~/.codex-runtime/lead
-~/.codex-runtime/peer
-~/.codex-runtime/review
+~/.grok-runtime/supervisor
+~/.grok-runtime/lead
+~/.grok-runtime/peer
+~/.grok-runtime/review
 ```
 
-Use `scripts/export-runtime-snapshots` for sanitized local summaries. Snapshot directories are ignored by default.
-
+Dùng `scripts/export-runtime-snapshots` cho bản tóm tắt đã lọc. Thư mục snapshot mặc định bị gitignore.

@@ -1,122 +1,112 @@
 # Grok Room Setup
 
-Reproducible configuration for a four-role Grok room running through official Paseo:
+Cấu hình bốn vai Grok chạy qua **Paseo official** (`getpaseo/paseo`), không qua fork Paseo.
 
 ```text
-Paseo provider
-  -> grok-room <supervisor|lead|peer|review>
+Paseo (grok-supervisor | grok-lead | grok-peer | grok-review)
+  -> ~/.local/bin/grok-room <role>
   -> grok-room-sync
-  -> isolated ~/.grok-runtime/<role>
-  -> Grok ACP stdio
+  -> ~/.grok-runtime/<role>
+  -> grok agent stdio
 ```
 
-This repository deliberately does **not** own `~/.grok`. Each operator installs
-and authenticates Grok independently. The sync script copies only the existing
-Grok auth into four isolated role homes and generates each role's profile and
-config. Native Grok subagents are disabled in config, environment, and CLI flags.
+Repo này **không** sở hữu `~/.grok`. Mỗi người tự cài và đăng nhập Grok. Sync chỉ copy `auth.json` sang bốn home riêng rồi sinh profile/config.
 
-## What gets installed
+Bố cục overlay/script tham khảo setup room cũ; runtime hiện tại là Grok + Paseo official.
 
-The `home/` directory mirrors `$HOME`:
+## Người clone cần gì
 
-| Repository source | Local destination |
-| --- | --- |
-| `home/.config/codex-room/` | `~/.config/codex-room/` |
-| `home/.local/bin/codex-room*` | `~/.local/bin/` |
-| `home/.paseo/config.json.template` | `~/.paseo/config.json` |
+- macOS (hoặc Unix) với Bash, Python 3, Git, Node, npm, `jq`
+- Grok CLI đã cài và **đã login** (`grok` trên `PATH`)
+- SSH GitHub đọc được `git@github.com:getpaseo/paseo.git`
+- `~/.local/bin` nằm trên `PATH`
 
-`scripts/install-paseo-fork` is retained as a compatibility command name. It
-clones official upstream, creates the local `grok-room` branch, and links:
+Mặc định Paseo được clone tới `~/projects/supervisors/paseo-grok-room`. Đổi trong `paseo/source.toml` **trước** khi chạy `install-paseo-fork` nếu máy bạn khác path đó.
+
+## Cài
+
+```bash
+git clone git@github.com:tjeuba0/grok-room-setup.git grok-room-setup
+cd grok-room-setup
+
+./scripts/doctor
+./scripts/install                 # dry-run
+./scripts/install --apply         # backup rồi cài overlay, launcher, template Paseo
+./scripts/install-paseo-fork      # clone Paseo official, nhánh local grok-room, link CLI
+./scripts/sync-all                # sinh ~/.grok-runtime/{supervisor,lead,peer,review}
+./scripts/verify
+./scripts/verify --live           # daemon 127.0.0.1:6767 phải đang chạy
+```
+
+`install-paseo-fork` giữ tên lệnh cũ; nó **không** cài fork Paseo. Nó clone official, checkout commit đã pin trong `paseo/source.toml`, link:
 
 ```text
 ~/.local/bin/paseo
   -> ~/projects/supervisors/paseo-grok-room/packages/cli/bin/paseo
 ```
 
-`@@HOME@@` placeholders are rendered during installation. Runtime databases, sessions, logs, auth files, keypairs, tokens, worktrees, and backups are never installed from or exported into Git.
+File bị ghi đè được backup tại `~/.codex-room-backups/install-<UTC>/`. Installer không ghi `~/.grok` và không ghi `~/.codex`.
 
-## Install
-
-Prerequisites:
-
-- macOS or a Unix-like environment with Bash, Python 3, Git, Node, npm, and jq.
-- Grok installed and authenticated.
-- `~/.local/bin` on `PATH`.
-
-```bash
-git clone <this-repository-url> codex-room-setup
-cd codex-room-setup
-
-./scripts/doctor
-./scripts/install                 # dry-run only
-./scripts/install --apply         # backup and install
-./scripts/install-paseo-fork      # clone/verify official Paseo and link its CLI
-./scripts/sync-all                # materialize four GROK_HOME directories
-./scripts/verify                  # verify installed files and runtimes
-```
-
-The installer backs up every replaced file under:
-
-```text
-~/.codex-room-backups/install-<UTC timestamp>/
-```
-
-It never writes to `~/.codex`.
-
-## Paseo Desktop
-
-After the official checkout exists at `~/projects/supervisors/paseo-grok-room`:
+Sau khi có checkout Paseo:
 
 ```bash
 paseo daemon start
 paseo daemon status
-paseo-local-update
 ```
 
-That command updates the checkout, installs dependencies, builds and signs the local Desktop app, backs up the previous `/Applications/Paseo.app`, restarts the daemon, and opens Paseo.
+`paseo-local-update` kéo Paseo, build, thay Desktop app, restart daemon. Chỉ chạy khi không có agent đang làm việc.
 
-## Roles
+## Thế nào là xong
 
-| Role | Default model | Reasoning | Paseo tools |
+- `./scripts/verify` và `./scripts/verify --live` in `VERIFY_OK`
+- Paseo có bốn provider: `grok-supervisor`, `grok-lead`, `grok-peer`, `grok-review`
+- CLI `paseo` trỏ vào `paseo-grok-room`
+- Tạo **seat Lead mới**: thinking mặc định **High**; Review **Medium**
+
+Seat cũ không nhận thinking mới. Đổi overlay/config xong phải `sync-all`, `paseo daemon reload` (hoặc restart khi không có agent), rồi tạo seat mới.
+
+## Vai
+
+| Vai | Model | Thinking | `create_agent` Paseo |
 | --- | --- | --- | --- |
-| Supervisor | `grok-4.6` | high | yes |
-| Lead | `grok-4.6` | high | yes |
-| Peer | `grok-4.6` | high | no |
-| Review FAST | `grok-4.6` | medium | no |
+| Supervisor | `grok-4.6` | high | có |
+| Lead | `grok-4.6` | high | có |
+| Peer | `grok-4.6` | high | không |
+| Review FAST | `grok-4.6` | medium | không |
 
-Only Supervisor and Lead receive Paseo's agent catalog. Peer and Review have no
-direct `create_agent`, and every role launches Grok with native `Agent` removed.
-Review also removes native edit/write tools. Grok 1.0.13 ACP does not initialize
-under its `read-only` sandbox, so Review uses the workspace sandbox plus a
-behavioral read-only contract. Read [docs/architecture.md](docs/architecture.md)
-before changing these boundaries.
+Nhãn model (“Grok 4.6 High”) chỉ là chữ. Mức suy nghĩ là chip thinking / `thought_level`.
 
-## Common operations
+Native Grok subagent bị tắt trong `grok-room` (`--no-subagents`, `--disallowed-tools Agent`), không phải Paseo. Paseo chỉ tắt `create_agent` cho Peer/Review qua `paseoTools.enabled`. Review vẫn có shell; đó không phải sandbox tuyệt đối. Chi tiết: [docs/architecture.md](docs/architecture.md).
+
+## File được cài
+
+| Trong repo | Trên máy |
+| --- | --- |
+| `home/.config/codex-room/` | `~/.config/codex-room/` (tên thư mục cũ, nội dung Grok Room) |
+| `home/.local/bin/grok-room` | `~/.local/bin/grok-room` |
+| `home/.local/bin/grok-room-sync` | `~/.local/bin/grok-room-sync` |
+| `home/.paseo/config.json.template` | `~/.paseo/config.json` |
+
+`@@HOME@@` được thay lúc install. Session, log, auth, keypair, worktree, backup **không** vào Git.
+
+Launcher `codex-room*` còn trong repo để rollback, không phải provider đang chạy.
+
+## Thao tác thường dùng
 
 ```bash
-# Regenerate all role runtimes after changing an overlay
+# Sửa overlay xong, sinh lại runtime
 ./scripts/sync-all
 
-# Validate source only, without requiring installed runtimes
+# Chỉ kiểm tra source, chưa cần runtime đã cài
 ./scripts/verify --source
 
-# Include live Paseo checks
+# Có daemon Paseo
 ./scripts/verify --live
 
-# Export sanitized runtime summaries for local comparison
-./scripts/export-runtime-snapshots
-
-# Summarize one historical Codex rollout session for benchmarking
-./scripts/session-usage --role peer --session-id SESSION_ID
-
-# Count workflow-pilot markers without exporting rollout content
-./scripts/workflow-pilot-report --format json /path/to/rollout.jsonl
+# Sau khi sửa ~/.paseo/config.json
+paseo daemon reload
 ```
 
-See [docs/session-usage-benchmark.md](docs/session-usage-benchmark.md) for token,
-request, tool-call, timing, and API-equivalent cost definitions.
-See [docs/workflow-pilot.md](docs/workflow-pilot.md) for the setup-only workflow
-experiment and the evidence threshold for adding Paseo enforcement.
-
-The older Codex launchers and guarded candidate files remain as rollback
-references; they are not active providers in the Grok Room configuration.
+Đổi overlay: [docs/operations.md](docs/operations.md).  
+Path và quyền sở hữu: [docs/paths-and-ownership.md](docs/paths-and-ownership.md).  
+Paseo official: [docs/paseo-fork.md](docs/paseo-fork.md).

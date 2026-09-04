@@ -1,8 +1,9 @@
-# Measure Codex Session Usage and Cost
+# Measure session usage and cost
 
-Codex rollout JSONL files contain enough local telemetry to compare repository-onboarding benchmark runs without asking the agent to estimate its own usage.
+This helper was written for Codex rollout JSONL. Grok Room sessions live under
+`~/.grok-runtime/<role>/sessions/` and are not the same format.
 
-Use one fresh Codex session for one benchmark prompt. This keeps elapsed time, cumulative tokens, model requests, tool calls, and findings attributable to one run.
+Use one fresh session for one benchmark prompt. This keeps elapsed time, cumulative tokens, model requests, tool calls, and findings attributable to one run.
 
 ## Quick start
 
@@ -14,7 +15,7 @@ Given a JSONL file:
   /path/to/rollout-SESSION_ID.jsonl
 ```
 
-Or locate it by isolated Codex Room role and session ID:
+Or locate it by isolated role and session ID:
 
 ```bash
 ./scripts/session-usage \
@@ -22,13 +23,9 @@ Or locate it by isolated Codex Room role and session ID:
   --session-id 01a004a9-9790-77c2-925f-b4d18837afd6
 ```
 
-Role sessions normally live under:
-
-```text
-~/.codex-runtime/<role>/sessions/YYYY/MM/DD/rollout-*.jsonl
-```
-
-`CODEX_ROOM_RUNTIME_ROOT` or `--runtime-root` can override the runtime root.
+Live Grok sessions are under `~/.grok-runtime/<role>/sessions/`. This script still
+defaults to the legacy root `~/.codex-runtime`. Pass `--runtime-root` if you point
+it at another tree.
 
 ## What the script measures
 

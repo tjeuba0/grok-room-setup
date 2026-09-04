@@ -6,7 +6,7 @@ This setup relies on Paseo behavior for:
 - Per-provider command replacement.
 - Replacement model lists and `isDefault` selection.
 - Provider-specific MCP injection allowlists.
-- Codex app-server model and thinking controls.
+- Grok ACP model and thinking controls (`thought_level`).
 - Local Desktop and daemon operation from the source checkout.
 
 When rebasing onto upstream, verify these behaviors with this repository's tests and `scripts/verify --live`.

@@ -112,7 +112,7 @@ evidence, or prevents an unnecessary parallel frontier.
 
 ## Create an aggregate marker report
 
-Run the report over one or more local Codex rollout files:
+Run the report over one or more local rollout files:
 
 ```bash
 ./scripts/workflow-pilot-report --format json \
