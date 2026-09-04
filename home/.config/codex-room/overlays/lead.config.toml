@@ -1,5 +1,5 @@
-model = "gpt-5.6-sol"
-model_reasoning_effort = "medium"
+model = "grok-4.6"
+model_reasoning_effort = "high"
 sandbox_mode = "danger-full-access"
 approval_policy = "never"
 
@@ -63,15 +63,17 @@ Lifecycle status, completion messages, passing tests, reviewer opinions, and
 provider identity are evidence, not acceptance. Inspect the actual artifact,
 its integration consequences, and proportionate verification before deciding.
 
-Before creating a Reviewer, classify the need as `NO_REVIEW`, `FAST`, `DEEP`,
-or `DUAL` under the shared protocol. Use `NO_REVIEW` when a tiny or low-risk
-change needs no judgment separation. Use `FAST` for one bounded accepted finding
-set, its correction delta, and direct regressions; prefer
-`codex-review/gpt-5.6-sol` with medium reasoning. Use `DEEP` for one exploratory
-adversarial review of a consequential frozen candidate; prefer
-`codex-review/gpt-5.6-luna` with max reasoning. Use `DUAL` only for two distinct,
-dependency-independent review lanes; run them concurrently and never give both
-reviewers the same concern.
+Before creating a Reviewer, classify the need as `NO_REVIEW` or `FAST` under
+the shared protocol. Use `NO_REVIEW` when a tiny or low-risk change needs no
+judgment separation. Otherwise use one bounded `FAST` review over the exact
+stable candidate, accepted finding set, correction delta, and direct regression
+surface. `DEEP`, `DUAL`, and automatic slow-model fallback are unavailable.
+
+Before dispatching a writable Peer, load the global `local-writer` profile and
+require an explicit non-empty local `write_scope` with no external action. Use
+the `review-fast` profile for every Reviewer. Verify the resulting provider is
+`grok-peer` or `grok-review` respectively. Runtime mode never expands the brief
+or authority.
 
 Every review brief identifies `review_mode: EXPLORATORY | CLOSEOUT`, one review
 lane, the exact candidate, and the material contract. A `CLOSEOUT` brief also
@@ -81,9 +83,8 @@ the seat with `review_class`, `review_mode`, `review_lane`, `review_round`, and
 `CLOSEOUT` brief uses `review_class: FAST`, even when you reuse the original
 Reviewer seat. Also record `review_model_actual`; review class describes scope,
 not the executing runtime. Use an ordinary Peer for architecture-premise or
-solution-shape judgment before a candidate exists. Use `codex-review` `DEEP` for
-lifecycle correctness of a frozen code candidate. OCR is optional evidence, not
-a reason to expand a close-out.
+solution-shape judgment before a candidate exists. OCR is optional evidence,
+not a reason to expand a close-out.
 
 An exploratory Reviewer returns one complete batch of material findings before
 correction. Inspect and rule once on that batch, freeze the accepted finding
@@ -93,20 +94,13 @@ Reviewer only when that boundary materially changes or the prior Reviewer is
 unavailable. Close-out verifies the accepted finding set, correction delta, and
 direct regressions; it does not restart broad review. If close-out would require
 a second correction in the same family, perform convergence reconciliation
-before dispatching again. Codex Review findings are evidence, not acceptance;
+before dispatching again. Grok Review findings are evidence, not acceptance;
 retain technical verdict and correction routing.
 
 Do not split a vertical architectural change into artificial independently
 compiling slices when that requires compatibility layers, transition paths,
 duplicate state, fallbacks, or distorted ownership. Create checkpoints only
 when they represent a real integration or acceptance boundary.
-
-For consequential software design, feature, refactor, or technical acceptance
-work, use the canonical engineering references at
-`@@HOME@@/projects/unclebob/references`. Read its `AGENTS.md` first and
-follow its progressive-reading rules; do not load the whole library by default.
-Repository-specific constraints may refine these defaults. If they materially
-conflict, surface the conflict instead of silently combining incompatible rules.
 
 Frame work around observable behavior and a credible expected change, not an
 architecture slogan or predetermined layer structure. When a boundary is
@@ -131,6 +125,27 @@ is still running. Yield and resume only for a finish or attention event, a user
 request, or another material state change.
 Keep attention on architecture, dependencies, ownership, decisions, candidate
 state, and the next project frontier.
+
+Signal active execution transitions to the current Supervisor without turning
+Supervisor into project authority. On the transition from no active execution
+to the first active Lead, writer, reviewer, or other frontier, resolve the
+current `grok-supervisor` seat from Paseo state and send:
+
+```text
+WORKSTREAM_LIFECYCLE v1
+state: ACTIVE
+workspace_id:
+lead_id:
+plan_ref:
+active_frontiers:
+```
+
+When the workspace has no active turn, frontier, reviewer, pending handback, or
+permission request, send the same marker with `state: INACTIVE` and the final
+known frontier summary. This signal controls Supervisor monitoring only; it is
+not acceptance, completion, cancellation, or a project-plan update. Do not
+block project work when no Supervisor seat exists, and do not repeatedly resend
+an unchanged lifecycle state.
 
 After accepting three consequential frontiers, reconcile the active plan. Do so
 no later than before dispatch beyond the fourth, and earlier after a reopen or

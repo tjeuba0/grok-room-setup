@@ -4,11 +4,7 @@
     "listen": "127.0.0.1:6767",
     "mcp": {
       "injectIntoAgents": true,
-      "enabled": true,
-      "injectIntoProviders": [
-        "codex-supervisor",
-        "codex-lead"
-      ]
+      "enabled": true
     },
     "browserTools": {
       "enabled": false
@@ -18,22 +14,32 @@
     "appendSystemPrompt": "",
     "terminalProfiles": [
       {
-        "id": "codex",
-        "name": "Codex",
-        "command": "codex",
-        "icon": "codex"
+        "id": "grok",
+        "name": "Grok",
+        "command": "grok",
+        "icon": "grok"
+      }
+    ],
+    "agentProfiles": [
+      {
+        "id": "local-writer",
+        "name": "Grok Peer",
+        "icon": "grok",
+        "color": "blue",
+        "provider": "grok-peer",
+        "model": "grok-4.6",
+        "thinkingOptionId": "high",
+        "notes": "Bounded implementation owner. This seat cannot create or coordinate agents."
       },
       {
-        "id": "claude",
-        "name": "Claude Code",
-        "command": "claude",
-        "icon": "claude"
-      },
-      {
-        "id": "opencode",
-        "name": "OpenCode",
-        "command": "opencode",
-        "icon": "opencode"
+        "id": "review-fast",
+        "name": "Grok Review FAST",
+        "icon": "grok",
+        "color": "yellow",
+        "provider": "grok-review",
+        "model": "grok-4.6",
+        "thinkingOptionId": "medium",
+        "notes": "One bounded FAST review pass. Read-only and unable to create or coordinate agents."
       }
     ],
     "cors": {
@@ -50,154 +56,119 @@
   },
   "agents": {
     "providers": {
-      "codex-supervisor": {
-        "extends": "codex",
-        "label": "Codex Supervisor",
-        "description": "Portfolio governance seat using isolated Codex Room runtime",
+      "grok-supervisor": {
+        "extends": "acp",
+        "label": "Grok Supervisor",
+        "description": "Portfolio governance seat with Paseo orchestration tools",
         "command": [
-          "@@HOME@@/.local/bin/codex-room",
+          "@@HOME@@/.local/bin/grok-room",
           "supervisor"
         ],
-        "params": {
-          "sandbox_mode": "danger-full-access",
-          "approval_policy": "never"
+        "paseoTools": {
+          "enabled": true
         },
         "models": [
           {
-            "id": "gpt-5.6-sol",
-            "label": "Sol Medium",
+            "id": "grok-4.6",
+            "label": "Grok 4.6 High",
             "isDefault": true,
             "thinkingOptions": [
-              {
-                "id": "medium",
-                "label": "Medium",
-                "isDefault": true
-              }
+              { "id": "low", "label": "Low" },
+              { "id": "medium", "label": "Medium" },
+              { "id": "high", "label": "High", "isDefault": true }
             ]
           }
         ]
       },
-      "codex-peer": {
-        "extends": "codex",
-        "label": "Codex Peer",
+      "grok-lead": {
+        "extends": "acp",
+        "label": "Grok Lead",
+        "description": "Project technical authority with Paseo orchestration tools",
+        "command": [
+          "@@HOME@@/.local/bin/grok-room",
+          "lead"
+        ],
+        "paseoTools": {
+          "enabled": true
+        },
+        "models": [
+          {
+            "id": "grok-4.6",
+            "label": "Grok 4.6 High",
+            "isDefault": true,
+            "thinkingOptions": [
+              { "id": "low", "label": "Low" },
+              { "id": "medium", "label": "Medium" },
+              { "id": "high", "label": "High", "isDefault": true }
+            ]
+          }
+        ]
+      },
+      "grok-peer": {
+        "extends": "acp",
+        "label": "Grok Peer",
         "description": "Bounded engineering seat without Paseo orchestration tools",
         "command": [
-          "@@HOME@@/.local/bin/codex-room",
+          "@@HOME@@/.local/bin/grok-room",
           "peer"
         ],
-        "params": {
-          "sandbox_mode": "danger-full-access",
-          "approval_policy": "never"
+        "paseoTools": {
+          "enabled": false
         },
         "models": [
           {
-            "id": "gpt-5.6-sol",
-            "label": "Sol Medium",
+            "id": "grok-4.6",
+            "label": "Grok 4.6 High",
             "isDefault": true,
             "thinkingOptions": [
-              {
-                "id": "medium",
-                "label": "Medium",
-                "isDefault": true
-              }
-            ]
-          },
-          {
-            "id": "gpt-5.6-luna",
-            "label": "Luna Max",
-            "thinkingOptions": [
-              {
-                "id": "max",
-                "label": "Max",
-                "isDefault": true
-              }
+              { "id": "low", "label": "Low" },
+              { "id": "medium", "label": "Medium" },
+              { "id": "high", "label": "High", "isDefault": true }
             ]
           }
         ]
       },
-      "codex-review": {
-        "extends": "codex",
-        "label": "Codex Review",
-        "description": "Read-only stable-candidate reviewer under Lead authority",
+      "grok-review": {
+        "extends": "acp",
+        "label": "Grok Review FAST",
+        "description": "Read-only bounded FAST reviewer without Paseo orchestration tools",
         "command": [
-          "@@HOME@@/.local/bin/codex-room",
+          "@@HOME@@/.local/bin/grok-room",
           "review"
         ],
-        "params": {
-          "sandbox_mode": "danger-full-access",
-          "approval_policy": "never"
+        "paseoTools": {
+          "enabled": false
         },
         "models": [
           {
-            "id": "gpt-5.6-luna",
-            "label": "Luna Max",
+            "id": "grok-4.6",
+            "label": "Grok 4.6 Medium",
             "isDefault": true,
             "thinkingOptions": [
-              {
-                "id": "max",
-                "label": "Max",
-                "isDefault": true
-              }
+              { "id": "low", "label": "Low" },
+              { "id": "medium", "label": "Medium", "isDefault": true },
+              { "id": "high", "label": "High" }
             ]
           }
         ]
       },
-      "grok": {
-        "extends": "acp",
-        "label": "Grok",
-        "description": "xAI's Grok Build agentic coding CLI with plan mode and parallel subagents. Requires a SuperGrok or X Premium+ subscription.",
-        "command": [
-          "grok",
-          "agent",
-          "stdio"
-        ],
-        "env": {}
+      "claude": {
+        "enabled": false
       },
-      "pi": {
-        "enabled": true
-      },
-      "opencode": {
+      "codex": {
         "enabled": false
       },
       "copilot": {
         "enabled": false
       },
-      "hermes": {
-        "extends": "acp",
-        "label": "Hermes",
-        "description": "Nous Research self-improving AI agent",
-        "command": [
-          "hermes",
-          "acp"
-        ],
-        "env": {}
+      "opencode": {
+        "enabled": false
       },
-      "codex-lead": {
-        "extends": "codex",
-        "label": "Codex Lead",
-        "description": "Project technical authority using isolated Codex Room runtime",
-        "command": [
-          "@@HOME@@/.local/bin/codex-room",
-          "lead"
-        ],
-        "params": {
-          "sandbox_mode": "danger-full-access",
-          "approval_policy": "never"
-        },
-        "models": [
-          {
-            "id": "gpt-5.6-sol",
-            "label": "Sol Medium",
-            "isDefault": true,
-            "thinkingOptions": [
-              {
-                "id": "medium",
-                "label": "Medium",
-                "isDefault": true
-              }
-            ]
-          }
-        ]
+      "pi": {
+        "enabled": false
+      },
+      "omp": {
+        "enabled": false
       }
     }
   },

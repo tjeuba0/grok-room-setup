@@ -15,6 +15,8 @@ HOME_MIRROR = ROOT / "home"
 ROOM = HOME_MIRROR / ".config" / "codex-room"
 PASEO_TEMPLATE = HOME_MIRROR / ".paseo" / "config.json.template"
 SYNC = HOME_MIRROR / ".local" / "bin" / "codex-room-sync"
+GROK_SYNC = HOME_MIRROR / ".local" / "bin" / "grok-room-sync"
+GROK_LAUNCHER = HOME_MIRROR / ".local" / "bin" / "grok-room"
 SESSION_USAGE = ROOT / "scripts" / "session-usage"
 WORKFLOW_PILOT_REPORT = ROOT / "scripts" / "workflow-pilot-report"
 
@@ -26,27 +28,32 @@ class SetupShapeTests(unittest.TestCase):
     def test_paseo_template_is_valid_and_has_expected_roles(self) -> None:
         config = json.loads(PASEO_TEMPLATE.read_text().replace("@@HOME@@", "/tmp/operator"))
         providers = config["agents"]["providers"]
-        room_roles = sorted(name for name in providers if name.startswith("codex-"))
+        room_roles = sorted(name for name in providers if name.startswith("grok-"))
         self.assertEqual(
             room_roles,
-            ["codex-lead", "codex-peer", "codex-review", "codex-supervisor"],
+            ["grok-lead", "grok-peer", "grok-review", "grok-supervisor"],
+        )
+        self.assertTrue(providers["grok-supervisor"]["paseoTools"]["enabled"])
+        self.assertTrue(providers["grok-lead"]["paseoTools"]["enabled"])
+        self.assertFalse(providers["grok-peer"]["paseoTools"]["enabled"])
+        self.assertFalse(providers["grok-review"]["paseoTools"]["enabled"])
+        self.assertEqual(
+            providers["grok-review"]["command"],
+            ["/tmp/operator/.local/bin/grok-room", "review"],
         )
         self.assertEqual(
-            config["daemon"]["mcp"]["injectIntoProviders"],
-            ["codex-supervisor", "codex-lead"],
+            sorted(profile["id"] for profile in config["daemon"]["agentProfiles"]),
+            ["local-writer", "review-fast"],
         )
-        self.assertEqual(
-            providers["codex-review"]["command"],
-            ["/tmp/operator/.local/bin/codex-room", "review"],
-        )
+        self.assertNotIn("review-deep", json.dumps(config))
 
     def test_role_defaults_are_aligned(self) -> None:
         config = json.loads(PASEO_TEMPLATE.read_text().replace("@@HOME@@", "/tmp/operator"))
         expected = {
-            "supervisor": ("gpt-5.6-sol", "medium"),
-            "lead": ("gpt-5.6-sol", "medium"),
-            "peer": ("gpt-5.6-sol", "medium"),
-            "review": ("gpt-5.6-luna", "max"),
+            "supervisor": ("grok-4.6", "high"),
+            "lead": ("grok-4.6", "high"),
+            "peer": ("grok-4.6", "high"),
+            "review": ("grok-4.6", "medium"),
         }
         for role, (model, effort) in expected.items():
             overlay_text = (ROOM / "overlays" / f"{role}.config.toml").read_text()
@@ -57,13 +64,29 @@ class SetupShapeTests(unittest.TestCase):
                     flags=re.MULTILINE,
                 )
             )
-            profile_models = config["agents"]["providers"][f"codex-{role}"]["models"]
+            profile_models = config["agents"]["providers"][f"grok-{role}"]["models"]
             default = next(item for item in profile_models if item.get("isDefault"))
             self.assertEqual(overlay["model"], model)
             self.assertEqual(overlay["model_reasoning_effort"], effort)
             self.assertEqual(default["id"], model)
-            thinking = next(item for item in default["thinkingOptions"] if item.get("isDefault"))
-            self.assertEqual(thinking["id"], effort)
+            thinking_default = next(
+                option["id"]
+                for option in default["thinkingOptions"]
+                if option.get("isDefault")
+            )
+            self.assertEqual(thinking_default, effort)
+
+        profiles = {
+            profile["id"]: profile for profile in config["daemon"]["agentProfiles"]
+        }
+        self.assertEqual(profiles["local-writer"]["thinkingOptionId"], "high")
+        self.assertEqual(profiles["review-fast"]["thinkingOptionId"], "medium")
+
+        launcher = GROK_LAUNCHER.read_text()
+        self.assertIn("--no-subagents", launcher)
+        self.assertIn('disallowed_tools=Agent', launcher)
+        self.assertIn('--disallowed-tools "${disallowed_tools}"', launcher)
+        self.assertIn("GROK_SUBAGENTS=0", launcher)
 
     def test_no_private_state_or_machine_home_is_tracked(self) -> None:
         forbidden_names = {
@@ -93,7 +116,7 @@ class SetupShapeTests(unittest.TestCase):
             paseo_config = fake_home / ".paseo" / "config.json"
             self.assertTrue(paseo_config.is_file())
             self.assertNotIn("@@HOME@@", paseo_config.read_text())
-            self.assertIn(str(fake_home / ".local" / "bin" / "codex-room"), paseo_config.read_text())
+            self.assertIn(str(fake_home / ".local" / "bin" / "grok-room"), paseo_config.read_text())
             protocol = fake_home / ".config" / "codex-room" / "workflow" / "WORKSPACE_PROTOCOL.md"
             self.assertTrue(protocol.is_file())
             self.assertIn("FRONTIER_BRIEF v1", protocol.read_text())
@@ -111,31 +134,43 @@ class SetupShapeTests(unittest.TestCase):
             self.assertFalse((fake_home / ".codex").exists())
             self.assertFalse((fake_home / ".codex-runtime").exists())
 
-    def test_paseo_fork_installer_links_cli(self) -> None:
+    def test_official_paseo_installer_creates_grok_room_branch_and_links_cli(self) -> None:
         with tempfile.TemporaryDirectory() as temporary:
             fake_home = Path(temporary) / "home"
-            checkout = Path(temporary) / "paseo"
-            cli = checkout / "packages" / "cli" / "bin" / "paseo"
-            cli.parent.mkdir(parents=True)
-            cli.write_text("#!/usr/bin/env node\n")
-            subprocess.run(["git", "init", "-q", str(checkout)], check=True)
-            subprocess.run(["git", "-C", str(checkout), "add", "."], check=True)
+            source = Path(temporary) / "source"
+            remote = Path(temporary) / "upstream.git"
+            checkout = Path(temporary) / "paseo-grok-room"
+            cli_source = source / "packages" / "cli" / "bin" / "paseo"
+            cli_source.parent.mkdir(parents=True)
+            cli_source.write_text("#!/usr/bin/env node\n")
+            subprocess.run(["git", "init", "-q", "-b", "main", str(source)], check=True)
+            subprocess.run(["git", "-C", str(source), "add", "."], check=True)
             subprocess.run(
                 [
-                    "git", "-C", str(checkout),
+                    "git", "-C", str(source),
                     "-c", "user.name=Test", "-c", "user.email=test@example.invalid",
                     "commit", "-qm", "fixture",
                 ],
                 check=True,
             )
+            subprocess.run(["git", "init", "-q", "--bare", str(remote)], check=True)
+            subprocess.run(["git", "-C", str(source), "remote", "add", "origin", str(remote)], check=True)
+            subprocess.run(["git", "-C", str(source), "push", "-q", "origin", "main"], check=True)
+            verified_commit = subprocess.run(
+                ["git", "-C", str(source), "rev-parse", "HEAD"],
+                check=True,
+                capture_output=True,
+                text=True,
+            ).stdout.strip()
 
             env = os.environ.copy()
             env.update(
                 {
                     "HOME": str(fake_home),
                     "PASEO_REPO_DIR": str(checkout),
-                    "PASEO_FORK_URL": "git@example.invalid:fork/paseo.git",
-                    "PASEO_UPSTREAM_URL": "git@example.invalid:upstream/paseo.git",
+                    "PASEO_UPSTREAM_URL": str(remote),
+                    "PASEO_VERIFIED_COMMIT": verified_commit,
+                    "PASEO_LIVE_REFERENCE_DIR": str(Path(temporary) / "missing-live"),
                 }
             )
             subprocess.run(
@@ -148,7 +183,25 @@ class SetupShapeTests(unittest.TestCase):
 
             link = fake_home / ".local" / "bin" / "paseo"
             self.assertTrue(link.is_symlink())
-            self.assertEqual(os.readlink(link), str(cli))
+            self.assertEqual(os.readlink(link), str(checkout / "packages" / "cli" / "bin" / "paseo"))
+            self.assertEqual(
+                subprocess.run(
+                    ["git", "-C", str(checkout), "branch", "--show-current"],
+                    check=True,
+                    capture_output=True,
+                    text=True,
+                ).stdout.strip(),
+                "grok-room",
+            )
+            self.assertEqual(
+                subprocess.run(
+                    ["git", "-C", str(checkout), "rev-parse", "HEAD"],
+                    check=True,
+                    capture_output=True,
+                    text=True,
+                ).stdout.strip(),
+                verified_commit,
+            )
 
     def test_session_usage_reports_requests_tools_tokens_and_cost(self) -> None:
         fixture = ROOT / "tests" / "fixtures" / "session-usage.jsonl"
@@ -221,8 +274,9 @@ class SetupShapeTests(unittest.TestCase):
         self.assertIn("PLAN_RECONCILIATION v1", lead)
         self.assertIn("NO_REVIEW", lead)
         self.assertIn("FAST", lead)
-        self.assertIn("DEEP", lead)
-        self.assertIn("DUAL", lead)
+        self.assertIn("`DEEP`, `DUAL`, and automatic slow-model fallback are unavailable", lead)
+        self.assertIn("`local-writer` profile", lead)
+        self.assertIn("`review-fast` profile", lead)
         self.assertIn("review_mode: EXPLORATORY | CLOSEOUT", lead)
 
         review = (ROOM / "overlays" / "review.config.toml").read_text()
@@ -230,57 +284,40 @@ class SetupShapeTests(unittest.TestCase):
         self.assertIn("CLOSEOUT_CLEAR", review)
         self.assertIn("CLOSEOUT_FINDINGS", review)
         self.assertIn("Do not report `CLOSEOUT_NO_FINDINGS`", review)
+        self.assertIn("Grok Review FAST", review)
 
         lead = (ROOM / "overlays" / "lead.config.toml").read_text()
         self.assertIn("Every\n`CLOSEOUT` brief uses `review_class: FAST`", lead)
         self.assertIn("`review_model_actual`", lead)
         self.assertIn("do not emit updates that only say no event has arrived", lead)
+        self.assertIn("WORKSTREAM_LIFECYCLE v1", lead)
 
         self.assertIn("Review classes and close-out", protocol)
+        self.assertIn("`DEEP`, `DUAL`, and automatic slow-model fallback are intentionally unavailable", protocol)
         self.assertIn("one correction batch", protocol)
         self.assertIn("PEER_DISPOSITION v1", peer)
         self.assertIn("workflow pilot", supervisor)
 
 
-class RuntimeGenerationTests(unittest.TestCase):
+class GrokRuntimeGenerationTests(unittest.TestCase):
     def setUp(self) -> None:
         self.temporary = tempfile.TemporaryDirectory()
         self.root = Path(self.temporary.name)
-        self.canonical = self.root / "canonical"
-        self.workflow = self.root / "room-workflow"
+        self.fake_home = self.root / "home"
+        self.canonical = self.root / "canonical-grok"
+        self.room = self.root / "room-config"
+        self.overlays = self.room / "overlays"
+        self.workflow = self.room / "workflow"
+        self.fake_home.mkdir()
         self.canonical.mkdir()
+        self.overlays.mkdir(parents=True)
         self.workflow.mkdir()
-
-        (self.canonical / "config.toml").write_text(
-            '\n'.join(
-                [
-                    'model = "base-model"',
-                    'model_reasoning_effort = "low"',
-                    'sandbox_mode = "read-only"',
-                    'approval_policy = "on-request"',
-                    '',
-                    '[mcp_servers.example]',
-                    'url = "https://example.invalid/mcp"',
-                    '',
-                    '[features]',
-                    'multi_agent = true',
-                    'multi_agent_v2 = true',
-                    '',
-                    '[agents]',
-                    'enabled = true',
-                    '',
-                ]
-            )
-        )
+        (self.canonical / "auth.json").write_text("{}\n")
         for role in ("supervisor", "lead", "peer", "review"):
             shutil.copyfile(
                 ROOM / "overlays" / f"{role}.config.toml",
-                self.canonical / f"{role}.config.toml",
+                self.overlays / f"{role}.config.toml",
             )
-        for name in ("auth.json", "AGENTS.md", "hooks.json", "model-instructions.md"):
-            (self.canonical / name).write_text("{}\n" if name.endswith(".json") else "fixture\n")
-        for name in ("skills", "plugins"):
-            (self.canonical / name).mkdir()
         for name in ("WORKSPACE_PROTOCOL.md", "ANTI_PATTERNS.md", "SUPERVISOR_NOTEBOOK.md"):
             (self.workflow / name).write_text(f"# {name}\n")
 
@@ -289,38 +326,44 @@ class RuntimeGenerationTests(unittest.TestCase):
 
     def run_sync(self, role: str) -> Path:
         env = os.environ.copy()
-        env["CODEX_ROOM_LAB_ROOT"] = str(self.root)
-        env["CODEX_ROOM_MODEL_CATALOG"] = str(ROOT / "tests" / "fixtures" / "model-catalog.json")
-        subprocess.run(["python3", str(SYNC), role], check=True, env=env, capture_output=True, text=True)
+        env["HOME"] = str(self.fake_home)
+        env["GROK_ROOM_LAB_ROOT"] = str(self.root)
+        subprocess.run(["python3", str(GROK_SYNC), role], check=True, env=env, capture_output=True, text=True)
         return self.root / ".runtime" / role
 
-    def test_all_roles_generate_isolated_configs(self) -> None:
-        expected = {
-            "supervisor": ("gpt-5.6-sol", "medium"),
-            "lead": ("gpt-5.6-sol", "medium"),
-            "peer": ("gpt-5.6-sol", "medium"),
-            "review": ("gpt-5.6-luna", "max"),
-        }
-        for role, (model, effort) in expected.items():
+    def test_all_roles_generate_isolated_grok_homes(self) -> None:
+        for role in ("supervisor", "lead", "peer", "review"):
             runtime = self.run_sync(role)
             config = (runtime / "config.toml").read_text()
-            self.assertIn(f'model = "{model}"', config)
-            self.assertIn(f'model_reasoning_effort = "{effort}"', config)
-            self.assertIn("multi_agent = false", config)
-            self.assertIn("multi_agent_v2 = false", config)
-            self.assertTrue((runtime / "skills").is_symlink())
-            self.assertTrue((runtime / "WORKSPACE_PROTOCOL.md").is_symlink())
-            catalog = json.loads((runtime / "model-catalog.no-native-agents.json").read_text())
-            self.assertTrue(all(model["multi_agent_version"] is None for model in catalog["models"]))
+            profile = (runtime / "agent-profile.md").read_text()
+            self.assertIn('[subagents]\nenabled = false', config)
+            self.assertIn('[memory]\nenabled = false', config)
+            self.assertIn('default_skills_installs_purged = true', config)
+            self.assertNotIn('managed_config = false', config)
+            self.assertIn('model: grok-4.6', profile)
+            self.assertIn(f'name: grok-{role}', profile)
+            self.assertTrue((runtime / "auth.json").is_file())
+            self.assertFalse((runtime / "managed_config.toml").exists())
+            self.assertFalse((runtime / "requirements.toml").exists())
+            self.assertTrue((runtime / "hooks").is_dir())
+            self.assertTrue((runtime / "hooks-paths").is_file())
 
-    def test_review_strips_mcp_servers(self) -> None:
+    def test_review_is_fast_behaviorally_read_only_and_has_no_orchestration_authority(self) -> None:
         runtime = self.run_sync("review")
-        self.assertNotIn("[mcp_servers.", (runtime / "config.toml").read_text())
+        profile = (runtime / "agent-profile.md").read_text()
+        self.assertIn("Grok Review FAST", profile)
+        self.assertIn("DEEP, DUAL, and", profile)
+        self.assertIn("must never create, manage, or delegate", profile)
+        self.assertFalse((runtime / "sandbox.toml").exists())
+        launcher = GROK_LAUNCHER.read_text()
+        self.assertIn("Agent,Edit,Write,MultiEdit", launcher)
 
-    def test_supervisor_keeps_mcp_servers_and_initializes_notebook(self) -> None:
+    def test_supervisor_initializes_notebook_and_uses_paseo_only(self) -> None:
         runtime = self.run_sync("supervisor")
-        self.assertIn("[mcp_servers.example]", (runtime / "config.toml").read_text())
         self.assertTrue((runtime / "SUPERVISOR_NOTEBOOK.md").is_file())
+        profile = (runtime / "agent-profile.md").read_text()
+        self.assertIn("only through the Paseo tools", profile)
+        self.assertIn("Never use Grok native subagents", profile)
 
 
 if __name__ == "__main__":

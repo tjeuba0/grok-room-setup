@@ -97,6 +97,8 @@ done <<'EOF'
 .config/codex-room/paseo.phase2-hard-cut.candidate.json.template|.config/codex-room/paseo.phase2-hard-cut.candidate.json|600
 .local/bin/codex-room|.local/bin/codex-room|755
 .local/bin/codex-room-sync|.local/bin/codex-room-sync|755
+.local/bin/grok-room|.local/bin/grok-room|755
+.local/bin/grok-room-sync|.local/bin/grok-room-sync|755
 .local/bin/codex-room-hard-cut|.local/bin/codex-room-hard-cut|700
 .local/bin/codex-review-apply|.local/bin/codex-review-apply|700
 .local/bin/paseo-local-update|.local/bin/paseo-local-update|755
@@ -119,4 +121,4 @@ if [[ -d "$backup_root" ]]; then
   log "BACKUP     $backup_root"
 fi
 log "INSTALL_COMPLETE: $changed file(s) changed"
-log "Next: scripts/sync-all"
+log "Next: scripts/sync-all (generates isolated Grok role homes)"

@@ -56,6 +56,8 @@ done <<'EOF'
 .config/codex-room/paseo.phase2-hard-cut.candidate.json.template|.config/codex-room/paseo.phase2-hard-cut.candidate.json
 .local/bin/codex-room|.local/bin/codex-room
 .local/bin/codex-room-sync|.local/bin/codex-room-sync
+.local/bin/grok-room|.local/bin/grok-room
+.local/bin/grok-room-sync|.local/bin/grok-room-sync
 .local/bin/codex-room-hard-cut|.local/bin/codex-room-hard-cut
 .local/bin/codex-review-apply|.local/bin/codex-review-apply
 .local/bin/paseo-local-update|.local/bin/paseo-local-update
@@ -66,4 +68,4 @@ remove_managed_paseo_link
 
 log "UNINSTALL_COMPLETE"
 log "backup=$backup_root"
-log "Generated ~/.codex-runtime and Paseo state were preserved."
+log "Generated ~/.codex-runtime, ~/.grok-runtime, and Paseo state were preserved."

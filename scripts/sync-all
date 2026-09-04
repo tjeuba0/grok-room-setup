@@ -3,7 +3,7 @@ set -euo pipefail
 
 source "$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/lib/common.sh"
 
-sync_bin="${CODEX_ROOM_SYNC_BIN:-$HOME/.local/bin/codex-room-sync}"
+sync_bin="${GROK_ROOM_SYNC_BIN:-$HOME/.local/bin/grok-room-sync}"
 [[ -x "$sync_bin" ]] || die "sync launcher is missing or not executable: $sync_bin"
 
 if [[ "$#" -eq 0 ]]; then
@@ -21,5 +21,4 @@ for role in "${roles[@]}"; do
   "$sync_bin" "$role"
 done
 
-log "SYNC_COMPLETE: ${roles[*]}"
-
+log "GROK_SYNC_COMPLETE: ${roles[*]}"

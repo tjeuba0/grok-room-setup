@@ -36,17 +36,20 @@ if [[ "$mode" == source ]]; then
   config_template="$REPO_ROOT/home/.paseo/config.json.template"
   overlays_root="$REPO_ROOT/home/.config/codex-room/overlays"
   workflow_root="$REPO_ROOT/home/.config/codex-room/workflow"
-  sync_path="$REPO_ROOT/home/.local/bin/codex-room-sync"
+  sync_path="$REPO_ROOT/home/.local/bin/grok-room-sync"
+  launcher_path="$REPO_ROOT/home/.local/bin/grok-room"
 else
   config_template="$HOME/.paseo/config.json"
   overlays_root="$HOME/.config/codex-room/overlays"
   workflow_root="$HOME/.config/codex-room/workflow"
-  sync_path="$HOME/.local/bin/codex-room-sync"
+  sync_path="$HOME/.local/bin/grok-room-sync"
+  launcher_path="$HOME/.local/bin/grok-room"
 fi
 
 check "Paseo config exists" test -f "$config_template"
 check "Paseo config is valid JSON" jq -e . "$config_template"
-check "room sync exists" test -f "$sync_path"
+check "Grok room sync exists" test -f "$sync_path"
+check "Grok room launcher exists" test -f "$launcher_path"
 check "workspace protocol exists" test -f "$workflow_root/WORKSPACE_PROTOCOL.md"
 check "workflow pilot reporter is executable" test -x "$REPO_ROOT/scripts/workflow-pilot-report"
 
@@ -64,39 +67,61 @@ for marker in \
   check "workspace protocol includes $marker" grep -Fq "$marker" "$workflow_root/WORKSPACE_PROTOCOL.md"
 done
 
-check "four derived Codex providers" jq -e '
-  [.agents.providers | keys[] | select(startswith("codex-"))] |
-  sort == ["codex-lead", "codex-peer", "codex-review", "codex-supervisor"]
+check "four Grok Room providers" jq -e '
+  [.agents.providers | keys[] | select(startswith("grok-"))] |
+  sort == ["grok-lead", "grok-peer", "grok-review", "grok-supervisor"]
 ' "$config_template"
-check "MCP injection boundary" jq -e '
-  .daemon.mcp.injectIntoProviders == ["codex-supervisor", "codex-lead"]
+check "provider-scoped Paseo tool boundary" jq -e '
+  .daemon.mcp.injectIntoAgents == true and
+  .agents.providers["grok-supervisor"].paseoTools.enabled == true and
+  .agents.providers["grok-lead"].paseoTools.enabled == true and
+  .agents.providers["grok-peer"].paseoTools.enabled == false and
+  .agents.providers["grok-review"].paseoTools.enabled == false
 ' "$config_template"
-check "review defaults to Luna Max" jq -e '
-  .agents.providers["codex-review"].models[0] |
-  .id == "gpt-5.6-luna" and .isDefault == true and
-  .thinkingOptions[0].id == "max" and .thinkingOptions[0].isDefault == true
+check "FAST-only profile set" jq -e '
+  [.daemon.agentProfiles[].id] | sort == ["local-writer", "review-fast"]
 ' "$config_template"
+check "all active Room providers use Grok 4.6" jq -e '
+  . as $root |
+  all(["grok-supervisor", "grok-lead", "grok-peer", "grok-review"][];
+    . as $id | $root.agents.providers[$id].models[0].id == "grok-4.6")
+' "$config_template"
+check "Paseo thinking defaults match role effort" jq -e '
+  (.agents.providers["grok-supervisor"].models[0].thinkingOptions[] | select(.isDefault == true) | .id) == "high" and
+  (.agents.providers["grok-lead"].models[0].thinkingOptions[] | select(.isDefault == true) | .id) == "high" and
+  (.agents.providers["grok-peer"].models[0].thinkingOptions[] | select(.isDefault == true) | .id) == "high" and
+  (.agents.providers["grok-review"].models[0].thinkingOptions[] | select(.isDefault == true) | .id) == "medium" and
+  (.daemon.agentProfiles[] | select(.id == "local-writer") | .thinkingOptionId) == "high" and
+  (.daemon.agentProfiles[] | select(.id == "review-fast") | .thinkingOptionId) == "medium"
+' "$config_template"
+check "non-Grok built-ins disabled" jq -e '
+  . as $root |
+  all(["claude", "codex", "copilot", "opencode", "pi", "omp"][];
+    . as $id | $root.agents.providers[$id].enabled == false)
+' "$config_template"
+check "native Grok agent tool disabled" grep -Fq 'disallowed_tools=Agent' "$launcher_path"
+check "native Grok subagents disabled" grep -Fq -- "--no-subagents" "$launcher_path"
+check "operating roles pin high effort" grep -Fq 'effort=high' "$launcher_path"
+check "FAST review effort pinned medium" grep -Fq 'effort=medium' "$launcher_path"
 
 if [[ "$mode" == installed ]]; then
-  expected_paseo_cli="$HOME/projects/supervisors/paseo/packages/cli/bin/paseo"
-  check "Paseo CLI links to local fork" test \
+  expected_paseo_cli="$HOME/projects/supervisors/paseo-grok-room/packages/cli/bin/paseo"
+  check "Paseo CLI links to official Grok Room checkout" test \
     "$(readlink "$HOME/.local/bin/paseo" 2>/dev/null || true)" = "$expected_paseo_cli"
   for role in supervisor lead peer review; do
-    runtime="$HOME/.codex-runtime/$role"
+    runtime="$HOME/.grok-runtime/$role"
     check "$role runtime config" test -f "$runtime/config.toml"
-    check "$role native agent catalog" test -f "$runtime/model-catalog.no-native-agents.json"
+    check "$role runtime profile" test -f "$runtime/agent-profile.md"
     if [[ -f "$runtime/config.toml" ]]; then
-      check "$role agents disabled" grep -Eq '^multi_agent(_v2)? = false$' "$runtime/config.toml"
+      check "$role native subagents disabled" awk '
+        $0 == "[subagents]" { in_subagents = 1; next }
+        in_subagents && /^\[/ { in_subagents = 0 }
+        in_subagents && $0 == "enabled = false" { disabled = 1 }
+        END { exit disabled ? 0 : 1 }
+      ' "$runtime/config.toml"
     fi
   done
-  if [[ -f "$HOME/.codex-runtime/review/config.toml" ]]; then
-    if grep -Eq '^\[mcp_servers\.' "$HOME/.codex-runtime/review/config.toml"; then
-      log "FAIL  review inherited MCP servers"
-      failures=$((failures + 1))
-    else
-      log "OK    review has no inherited MCP servers"
-    fi
-  fi
+  check "review native edit tools disabled" grep -Fq 'Agent,Edit,Write,MultiEdit' "$HOME/.local/bin/grok-room"
 fi
 
 if [[ "$live" == true ]]; then
@@ -105,7 +130,7 @@ if [[ "$live" == true ]]; then
   if paseo provider ls --host 127.0.0.1:6767 --json >"$inventory_file" 2>/dev/null; then
     check "live custom provider inventory" jq -e '
       [.[].provider] as $p |
-      all(["codex-supervisor", "codex-lead", "codex-peer", "codex-review"][]; . as $id | $p | index($id) != null)
+      all(["grok-supervisor", "grok-lead", "grok-peer", "grok-review"][]; . as $id | $p | index($id) != null)
     ' "$inventory_file"
   else
     log "FAIL  live Paseo provider inventory is unreachable"

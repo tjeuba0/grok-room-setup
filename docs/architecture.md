@@ -7,38 +7,34 @@
   custom provider command
       |
       v
-~/.local/bin/codex-room <role>
+~/.local/bin/grok-room <role>
       |
-      +-- codex-room-sync <role>
-      |     +-- reads ~/.codex/config.toml
+      +-- grok-room-sync <role>
+      |     +-- copies ~/.grok/auth.json
       |     +-- reads ~/.config/codex-room/overlays/<role>.config.toml
-      |     +-- reads codex debug models
-      |     `-- writes ~/.codex-runtime/<role>/
+      |     `-- writes ~/.grok-runtime/<role>/
       |
-      `-- CODEX_HOME=~/.codex-runtime/<role> codex ...
+      `-- GROK_HOME=~/.grok-runtime/<role> grok agent stdio
 ```
 
 ## Ownership
 
 | Layer | Owner | Mutable state |
 | --- | --- | --- |
-| `~/.codex` | Operator/Codex | Auth, global config, skills, plugins, sessions |
+| `~/.grok` | Operator/Grok | Canonical authentication |
 | `~/.config/codex-room` | This repository | Role overlays and shared workflow instructions |
-| `~/.codex-runtime` | `codex-room-sync` | Generated configs plus role-local sessions and databases |
+| `~/.grok-runtime` | `grok-room-sync` | Generated configs, profiles and role-local sessions |
 | `~/.paseo` | Paseo | Provider config, agents, projects, worktrees, logs and identity |
-| Paseo fork checkout | Git | Source code for CLI, daemon and Desktop |
+| Official Paseo `grok-room` checkout | Git | Source code for CLI, daemon and Desktop |
 
 ## Runtime merge
 
-For a role, the sync script:
+For a role, the sync script generates a standalone Grok profile, disables
+subagents/memory/external compatibility discovery, and copies only auth. The
+launcher repeats the subagent boundary with `GROK_SUBAGENTS=0`,
+`--no-subagents`, and `--disallowed-tools Agent`.
 
-1. Reads the operator's Codex user config as the base.
-2. Replaces an allowlisted set of top-level scalar values from the role overlay.
-3. Adds role-specific `developer_instructions`.
-4. Generates a model catalog with native multi-agent metadata removed.
-5. Forces `[agents].enabled = false` and all native multi-agent feature flags off.
-6. Symlinks shared Codex resources and room workflow files.
-7. Removes inherited MCP server tables for Review.
-
-CLI flags and trusted project `.codex/config.toml` files can still override generated user-level values according to normal Codex precedence.
-
+Official Paseo 0.7.2 resolves `agents.providers.<provider>.paseoTools` by the
+exact caller provider. Supervisor and Lead are enabled; Peer and Review are
+disabled. This controls the direct tool catalog, not shell-level authorization:
+an agent with arbitrary shell access could still invoke an absolute CLI path.

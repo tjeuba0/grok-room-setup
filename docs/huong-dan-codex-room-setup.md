@@ -216,7 +216,9 @@ Ví dụ, Lead giao “thêm cache vào adapter X”, nhưng Peer chứng minh d
 
 #### Review overlay
 
-Review là profile đọc và phản biện một candidate cố định. Mặc định dùng `gpt-5.6-luna` với reasoning `max`.
+Review là profile FAST đọc và phản biện một candidate cố định. Mặc định dùng
+`grok-4.6` với reasoning `medium`; không có profile DEEP hoặc fallback sang model
+chậm hơn.
 
 Review phải:
 

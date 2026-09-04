@@ -32,9 +32,7 @@ Lead selects the smallest sufficient review class before creating a Reviewer:
 | Class | Use | Default model | Expected rounds |
 | --- | --- | --- | --- |
 | `NO_REVIEW` | Tiny or low-risk work Lead can inspect directly | none | 0 |
-| `FAST` | Bounded correction close-out | Sol Medium | 1 close-out |
-| `DEEP` | Consequential exploratory falsification | Luna Max | 1 exploratory review |
-| `DUAL` | Two distinct, independent review lanes | lane-specific | concurrent |
+| `FAST` | One bounded exact-candidate or close-out pass | Grok 4.6 Medium | 1 review |
 
 An exploratory review returns one complete batch of material findings. Lead
 rules once and freezes the accepted finding set. One writer owns one correction
@@ -46,7 +44,7 @@ third review loop automatically.
 For pilot observability, Lead labels review seats with `review_class`,
 `review_mode`, `review_lane`, `review_round`, `candidate`, and
 `review_model_actual` when practical. Every close-out uses `review_class: FAST`,
-even when it reuses the original DEEP Reviewer seat. Review class measures the
+even when it reuses the original FAST Reviewer seat. Review class measures the
 work boundary; `review_model_actual` measures the runtime choice. These labels
 contain coordination metadata only; do not put prompts, source, or private
 evidence in labels.

@@ -1,16 +1,19 @@
-# Codex Room Setup
+# Grok Room Setup
 
-Reproducible configuration for a four-role Codex room running through a local Paseo fork:
+Reproducible configuration for a four-role Grok room running through official Paseo:
 
 ```text
 Paseo provider
-  -> codex-room <supervisor|lead|peer|review>
-  -> codex-room-sync
-  -> isolated ~/.codex-runtime/<role>
-  -> Codex app-server
+  -> grok-room <supervisor|lead|peer|review>
+  -> grok-room-sync
+  -> isolated ~/.grok-runtime/<role>
+  -> Grok ACP stdio
 ```
 
-This repository deliberately does **not** own `~/.codex`. Each operator installs and authenticates Codex independently. The sync script reads the operator's existing `~/.codex/config.toml` as its base and shares their auth, skills, plugins, hooks, and global `AGENTS.md` by symlink.
+This repository deliberately does **not** own `~/.grok`. Each operator installs
+and authenticates Grok independently. The sync script copies only the existing
+Grok auth into four isolated role homes and generates each role's profile and
+config. Native Grok subagents are disabled in config, environment, and CLI flags.
 
 ## What gets installed
 
@@ -22,11 +25,12 @@ The `home/` directory mirrors `$HOME`:
 | `home/.local/bin/codex-room*` | `~/.local/bin/` |
 | `home/.paseo/config.json.template` | `~/.paseo/config.json` |
 
-`scripts/install-paseo-fork` also creates this checkout-aware symlink:
+`scripts/install-paseo-fork` is retained as a compatibility command name. It
+clones official upstream, creates the local `grok-room` branch, and links:
 
 ```text
 ~/.local/bin/paseo
-  -> ~/projects/supervisors/paseo/packages/cli/bin/paseo
+  -> ~/projects/supervisors/paseo-grok-room/packages/cli/bin/paseo
 ```
 
 `@@HOME@@` placeholders are rendered during installation. Runtime databases, sessions, logs, auth files, keypairs, tokens, worktrees, and backups are never installed from or exported into Git.
@@ -36,7 +40,7 @@ The `home/` directory mirrors `$HOME`:
 Prerequisites:
 
 - macOS or a Unix-like environment with Bash, Python 3, Git, Node, npm, and jq.
-- Codex installed and authenticated.
+- Grok installed and authenticated.
 - `~/.local/bin` on `PATH`.
 
 ```bash
@@ -46,8 +50,8 @@ cd codex-room-setup
 ./scripts/doctor
 ./scripts/install                 # dry-run only
 ./scripts/install --apply         # backup and install
-./scripts/install-paseo-fork      # clone/verify the fork and link its CLI
-./scripts/sync-all                # materialize four CODEX_HOME directories
+./scripts/install-paseo-fork      # clone/verify official Paseo and link its CLI
+./scripts/sync-all                # materialize four GROK_HOME directories
 ./scripts/verify                  # verify installed files and runtimes
 ```
 
@@ -61,7 +65,7 @@ It never writes to `~/.codex`.
 
 ## Paseo Desktop
 
-After the fork exists at `~/projects/supervisors/paseo`:
+After the official checkout exists at `~/projects/supervisors/paseo-grok-room`:
 
 ```bash
 paseo daemon start
@@ -73,14 +77,19 @@ That command updates the checkout, installs dependencies, builds and signs the l
 
 ## Roles
 
-| Role | Default model | Reasoning | Paseo MCP injection |
+| Role | Default model | Reasoning | Paseo tools |
 | --- | --- | --- | --- |
-| Supervisor | `gpt-5.6-sol` | medium | yes |
-| Lead | `gpt-5.6-sol` | medium | yes |
-| Peer | `gpt-5.6-sol` | medium | no |
-| Review | `gpt-5.6-luna` | max | no |
+| Supervisor | `grok-4.6` | high | yes |
+| Lead | `grok-4.6` | high | yes |
+| Peer | `grok-4.6` | high | no |
+| Review FAST | `grok-4.6` | medium | no |
 
-All role overlays currently request `danger-full-access` with `approval_policy = "never"`. Review additionally strips inherited MCP server tables. Read [docs/architecture.md](docs/architecture.md) before changing these boundaries.
+Only Supervisor and Lead receive Paseo's agent catalog. Peer and Review have no
+direct `create_agent`, and every role launches Grok with native `Agent` removed.
+Review also removes native edit/write tools. Grok 1.0.13 ACP does not initialize
+under its `read-only` sandbox, so Review uses the workspace sandbox plus a
+behavioral read-only contract. Read [docs/architecture.md](docs/architecture.md)
+before changing these boundaries.
 
 ## Common operations
 
@@ -97,7 +106,7 @@ All role overlays currently request `danger-full-access` with `approval_policy =
 # Export sanitized runtime summaries for local comparison
 ./scripts/export-runtime-snapshots
 
-# Summarize one Codex rollout session for benchmarking
+# Summarize one historical Codex rollout session for benchmarking
 ./scripts/session-usage --role peer --session-id SESSION_ID
 
 # Count workflow-pilot markers without exporting rollout content
@@ -109,4 +118,5 @@ request, tool-call, timing, and API-equivalent cost definitions.
 See [docs/workflow-pilot.md](docs/workflow-pilot.md) for the setup-only workflow
 experiment and the evidence threshold for adding Paseo enforcement.
 
-Official Codex configuration precedence is documented by OpenAI in the [Codex config basics](https://learn.chatgpt.com/docs/config-file/config-basic.md). `codex-room` uses a separate `CODEX_HOME` per role; this is a local orchestration layer, not a replacement for the operator's Codex installation.
+The older Codex launchers and guarded candidate files remain as rollback
+references; they are not active providers in the Grok Room configuration.

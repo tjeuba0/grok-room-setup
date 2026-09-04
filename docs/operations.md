@@ -32,10 +32,15 @@ evidence for deciding whether a Paseo runtime mechanism is warranted.
 
 The installer does not restart the daemon because an active restart can interrupt running agents.
 
+Before cutover, verify every live agent is idle, snapshot `~/.paseo`,
+`~/.config/codex-room`, `~/.codex-runtime`, and the CLI symlink under a private
+backup directory, then test the new daemon on port 6768. Rollback restores those
+paths and relinks the previous checkout before restarting port 6767.
+
 ## Historical migration helpers
 
 `codex-room-hard-cut`, `codex-review-apply`, and the two candidate JSON files preserve the current installation's guarded migration procedure. They contain expected SHA-256 values and therefore fail closed after relevant config drift. They are reference/recovery tools, not routine install or update commands.
 
-## Update the local fork
+## Update official Paseo on the local `grok-room` branch
 
 Run `paseo-local-update` only when no important agent turn or Desktop operation is active. It pulls with rebase, builds, replaces the app and restarts the daemon.

@@ -1,14 +1,14 @@
-# Paseo fork
+# Official Paseo Grok Room checkout
 
-This setup targets Hoang's fork of Paseo and installs it at the same path used by the current local scripts.
+This setup targets official Paseo on a local branch. The existing live Hoang
+checkout is retained only as a comparison and rollback source.
 
 ```text
-fork remote: git@github.com:hoangnb24/paseo.git
-upstream:    git@github.com:getpaseo/paseo.git
-checkout:    ~/projects/supervisors/paseo
-branch:      main
-baseline:    v0.4.0-13-g1e84c503c
+origin:         git@github.com:getpaseo/paseo.git
+live reference: ~/projects/supervisors/paseo
+checkout:       ~/projects/supervisors/paseo-grok-room
+branch:         grok-room
+baseline:       v0.7.2-26-g75eb9d44a
 ```
 
 See `source.toml` for machine-readable provenance and `notes/` for the behavior this setup relies on.
-

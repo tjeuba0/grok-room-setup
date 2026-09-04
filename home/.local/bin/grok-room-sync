@@ -1,0 +1,221 @@
+#!/usr/bin/env python3
+"""Materialize an isolated Grok home and agent profile for one room role."""
+
+from __future__ import annotations
+
+import os
+import pathlib
+import re
+import shutil
+import tempfile
+
+
+ROLE_SETTINGS = {
+    "supervisor": {"effort": "high", "sandbox": "workspace"},
+    "lead": {"effort": "high", "sandbox": "workspace"},
+    "peer": {"effort": "high", "sandbox": "workspace"},
+    "review": {"effort": "medium", "sandbox": "workspace"},
+}
+
+ROLE_OVERRIDES = {
+    "supervisor": """
+Runtime identity: Grok Supervisor (`grok-supervisor`). The seats you operate are
+Grok seats. Delegate project leadership only through the Paseo tools exposed to
+this session, normally to provider `grok-lead`. Never use Grok native subagents.
+""",
+    "lead": """
+Runtime identity: Grok Lead (`grok-lead`). Delegate implementation only through
+Paseo to `grok-peer` (profile `local-writer`) and review only to `grok-review`
+(profile `review-fast`). DEEP and DUAL review are unavailable. All review is one
+bounded FAST pass over an exact candidate or correction delta. Never use Grok
+native subagents, and never ask a Peer or Reviewer to create another agent.
+""",
+    "peer": """
+Runtime identity: Grok Peer (`grok-peer`). Complete only the assigned ownership
+scope. This role has no Paseo orchestration catalog and must not create, manage,
+or delegate to another agent. Never use Grok native subagents.
+""",
+    "review": """
+Runtime identity: Grok Review FAST (`grok-review`). This is the only review
+class. Ignore earlier DEEP, DUAL, Luna, or max-reasoning routing language. Review
+one exact stable candidate in one bounded pass, report only material actionable
+findings with evidence, and do not edit project files. This role has no Paseo
+orchestration catalog and must never create, manage, or delegate to another
+agent. Never use Grok native subagents.
+""",
+}
+
+
+def resolved_path(env_name: str, default: pathlib.Path) -> pathlib.Path:
+    configured = os.environ.get(env_name)
+    return pathlib.Path(configured).expanduser().resolve() if configured else default.resolve()
+
+
+def deployment_paths() -> dict[str, pathlib.Path]:
+    home = pathlib.Path.home()
+    lab = os.environ.get("GROK_ROOM_LAB_ROOT")
+    if lab:
+        root = pathlib.Path(lab).expanduser().resolve()
+        return {
+            "canonical": resolved_path("GROK_ROOM_CANONICAL_HOME", root / "canonical-grok"),
+            "room": resolved_path("GROK_ROOM_CONFIG_HOME", root / "room-config"),
+            "runtime": resolved_path("GROK_ROOM_RUNTIME_ROOT", root / ".runtime"),
+        }
+    return {
+        "canonical": resolved_path("GROK_ROOM_CANONICAL_HOME", home / ".grok"),
+        "room": resolved_path("GROK_ROOM_CONFIG_HOME", home / ".config" / "codex-room"),
+        "runtime": resolved_path("GROK_ROOM_RUNTIME_ROOT", home / ".grok-runtime"),
+    }
+
+
+def write_atomic(target: pathlib.Path, content: str, mode: int = 0o600) -> None:
+    target.parent.mkdir(parents=True, exist_ok=True)
+    fd, temporary = tempfile.mkstemp(prefix=f"{target.stem}.", suffix=target.suffix, dir=target.parent)
+    try:
+        with os.fdopen(fd, "w") as stream:
+            stream.write(content)
+        os.chmod(temporary, mode)
+        os.replace(temporary, target)
+    finally:
+        if os.path.exists(temporary):
+            os.unlink(temporary)
+
+
+def developer_instructions(overlay: pathlib.Path, home: pathlib.Path) -> str:
+    text = overlay.read_text()
+    match = re.search(r'(?ms)^developer_instructions\s*=\s*"""(.*?)^"""\s*$', text)
+    if not match:
+        raise SystemExit(f"developer_instructions block is missing: {overlay}")
+    return match.group(1).strip().replace("@@HOME@@", str(home))
+
+
+def render_profile(role: str, instructions: str) -> str:
+    description = {
+        "supervisor": "Portfolio governance and Paseo operations",
+        "lead": "Project technical authority and Paseo orchestration",
+        "peer": "Bounded implementation owner without orchestration",
+        "review": "Bounded FAST reviewer without write or orchestration authority",
+    }[role]
+    return f"""---
+name: grok-{role}
+description: {description}
+prompt_mode: full
+model: grok-4.6
+permission_mode: default
+agents_md: true
+---
+
+{instructions}
+
+## Grok Room runtime override
+
+{ROLE_OVERRIDES[role].strip()}
+"""
+
+
+def render_config() -> str:
+    return """[cli]
+auto_update = false
+use_leader = false
+session_registry = false
+show_tips = false
+
+[models]
+default = "grok-4.6"
+
+[features]
+telemetry = false
+feedback = false
+voice_mode = false
+
+[marketplace]
+default_skills_installs_purged = true
+official_marketplace_auto_installed = true
+
+[memory]
+enabled = false
+
+[subagents]
+enabled = false
+
+[compat.claude]
+skills = false
+rules = false
+agents = false
+mcps = false
+hooks = false
+sessions = false
+
+[compat.cursor]
+skills = false
+rules = false
+agents = false
+mcps = false
+hooks = false
+sessions = false
+
+[compat.codex]
+sessions = false
+"""
+
+
+def copy_private_file(source: pathlib.Path, target: pathlib.Path, required: bool = False) -> None:
+    if not source.is_file():
+        if required:
+            raise SystemExit(f"required Grok resource is missing: {source}")
+        if target.exists():
+            target.unlink()
+        return
+    shutil.copy2(source, target)
+    target.chmod(0o600)
+
+
+def main() -> None:
+    if len(os.sys.argv) != 2 or os.sys.argv[1] not in ROLE_SETTINGS:
+        raise SystemExit(f"usage: {os.sys.argv[0]} <{'|'.join(ROLE_SETTINGS)}>")
+
+    role = os.sys.argv[1]
+    paths = deployment_paths()
+    runtime = paths["runtime"] / role
+    runtime.mkdir(parents=True, exist_ok=True)
+    runtime.chmod(0o700)
+
+    overlay = paths["room"] / "overlays" / f"{role}.config.toml"
+    instructions = developer_instructions(overlay, pathlib.Path.home())
+    write_atomic(runtime / "agent-profile.md", render_profile(role, instructions))
+    write_atomic(runtime / "config.toml", render_config())
+
+    copy_private_file(paths["canonical"] / "auth.json", runtime / "auth.json", required=True)
+    for unmanaged_name in ("managed_config.toml", "requirements.toml"):
+        unmanaged_path = runtime / unmanaged_name
+        if unmanaged_path.exists():
+            unmanaged_path.unlink()
+
+    hooks = runtime / "hooks"
+    hooks.mkdir(exist_ok=True)
+    hooks.chmod(0o700)
+    hooks_paths = runtime / "hooks-paths"
+    if not hooks_paths.exists():
+        write_atomic(hooks_paths, "")
+
+    sandbox_path = runtime / "sandbox.toml"
+    if sandbox_path.exists():
+        sandbox_path.unlink()
+
+    if role == "review":
+        review_sessions = pathlib.Path.home() / ".opencodereview" / "sessions"
+        review_sessions.mkdir(parents=True, exist_ok=True)
+
+    if role == "supervisor":
+        notebook = runtime / "SUPERVISOR_NOTEBOOK.md"
+        template = paths["room"] / "workflow" / "SUPERVISOR_NOTEBOOK.md"
+        if not notebook.exists():
+            if not template.is_file():
+                raise SystemExit(f"Supervisor notebook template is missing: {template}")
+            write_atomic(notebook, template.read_text(), mode=0o600)
+
+    print(runtime, file=os.sys.stderr)
+
+
+if __name__ == "__main__":
+    main()

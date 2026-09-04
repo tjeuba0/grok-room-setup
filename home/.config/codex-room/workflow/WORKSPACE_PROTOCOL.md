@@ -189,12 +189,13 @@ inspects the artifact and evidence, and Human accepts only owner-level trade-off
 Before creating a Reviewer, Lead selects the smallest sufficient review class:
 
 - `NO_REVIEW`: tiny or low-risk work that Lead can inspect directly.
-- `FAST`: bounded correction close-out on one accepted finding set and its direct
-  regression surface. Prefer Sol Medium.
-- `DEEP`: one exploratory adversarial review of a consequential frozen candidate.
-  Prefer Luna Max.
-- `DUAL`: two concurrent reviews only when their lanes are distinct and
-  dependency-independent. Provider or reviewer count creates no authority.
+- `FAST`: one bounded review of an exact stable candidate, accepted finding set,
+  correction delta, and direct regression surface. Use Grok 4.6 at low effort.
+
+`DEEP`, `DUAL`, and automatic slow-model fallback are intentionally unavailable
+in Grok Room. When one FAST lane cannot establish enough confidence, Lead must
+reframe or split the engineering concern instead of silently increasing review
+latency.
 
 Lead also declares `review_mode: EXPLORATORY | CLOSEOUT`, one review lane, and
 the candidate identity. In `EXPLORATORY` mode, Reviewer inspects the complete

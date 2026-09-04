@@ -1,0 +1,71 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+grok_bin="${GROK_BIN:-$(command -v grok)}"
+case "${1:-}" in
+  -v|--version)
+    exec "${grok_bin}" --version
+    ;;
+esac
+
+role="${1:?usage: grok-room <supervisor|lead|peer|review> [grok args...]}"
+shift
+
+case "$role" in
+  supervisor)
+    effort=high
+    sandbox=workspace
+    disallowed_tools=Agent
+    ;;
+  lead)
+    effort=high
+    sandbox=workspace
+    disallowed_tools=Agent
+    ;;
+  peer)
+    effort=high
+    sandbox=workspace
+    disallowed_tools=Agent
+    ;;
+  review)
+    effort=medium
+    sandbox=workspace
+    disallowed_tools=Agent,Edit,Write,MultiEdit,apply_patch,edit_file,write_file
+    ;;
+  *)
+    echo "unknown Grok Room role: $role" >&2
+    exit 2
+    ;;
+esac
+
+script_dir="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+sync_bin="${GROK_ROOM_SYNC_BIN:-${script_dir}/grok-room-sync}"
+runtime_root="${GROK_ROOM_RUNTIME_ROOT:-${HOME}/.grok-runtime}"
+
+"${sync_bin}" "${role}"
+export GROK_HOME="${runtime_root}/${role}"
+export GROK_SUBAGENTS=0
+export GROK_MEMORY=0
+export GROK_CLAUDE_AGENTS_ENABLED=false
+export GROK_CLAUDE_HOOKS_ENABLED=false
+export GROK_CLAUDE_MCPS_ENABLED=false
+export GROK_CLAUDE_RULES_ENABLED=false
+export GROK_CLAUDE_SKILLS_ENABLED=false
+export GROK_CURSOR_AGENTS_ENABLED=false
+export GROK_CURSOR_HOOKS_ENABLED=false
+export GROK_CURSOR_MCPS_ENABLED=false
+export GROK_CURSOR_RULES_ENABLED=false
+export GROK_CURSOR_SKILLS_ENABLED=false
+
+exec "${grok_bin}" \
+  --no-subagents \
+  --disallowed-tools "${disallowed_tools}" \
+  --sandbox "${sandbox}" \
+  agent \
+  --no-leader \
+  --always-approve \
+  --model grok-4.6 \
+  --reasoning-effort "${effort}" \
+  --agent-profile "${GROK_HOME}/agent-profile.md" \
+  "$@" \
+  stdio

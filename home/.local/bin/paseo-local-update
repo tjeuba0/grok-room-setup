@@ -2,14 +2,14 @@
 
 set -euo pipefail
 
-PASEO_REPO_DIR="${PASEO_REPO_DIR:-@@HOME@@/projects/supervisors/paseo}"
+PASEO_REPO_DIR="${PASEO_REPO_DIR:-@@HOME@@/projects/supervisors/paseo-grok-room}"
 PASEO_HOME_DIR="${PASEO_HOME_DIR:-@@HOME@@/.paseo}"
 INSTALLED_APP="/Applications/Paseo.app"
 
 if [[ "${1:-}" == "--help" || "${1:-}" == "-h" ]]; then
   print "Usage: paseo-local-update"
   print ""
-  print "Pull, build, sign, install, and restart the local Paseo fork."
+  print "Update, build, sign, install, and restart the official Grok Room checkout."
   print "Repo:  $PASEO_REPO_DIR"
   print "State: $PASEO_HOME_DIR"
   exit 0
@@ -43,7 +43,12 @@ case "$(uname -m)" in
     ;;
 esac
 
-print "[1/7] Updating local fork"
+if [[ "$(git remote get-url origin)" != "git@github.com:getpaseo/paseo.git" && "$(git remote get-url origin)" != "https://github.com/getpaseo/paseo.git" ]]; then
+  print -u2 "origin is not official getpaseo/paseo"
+  exit 1
+fi
+
+print "[1/7] Updating official Grok Room branch"
 git pull --rebase
 
 print "[2/7] Installing dependencies"

@@ -8,7 +8,9 @@
 ~/.config/codex-room/workflow/*.md
 ~/.local/bin/codex-room
 ~/.local/bin/codex-room-sync
-~/.local/bin/paseo -> ~/projects/supervisors/paseo/packages/cli/bin/paseo
+~/.local/bin/grok-room
+~/.local/bin/grok-room-sync
+~/.local/bin/paseo -> ~/projects/supervisors/paseo-grok-room/packages/cli/bin/paseo
 ~/.local/bin/paseo-local-update
 ~/.paseo/config.json
 ```
@@ -19,19 +21,19 @@ The Paseo CLI symlink is created by `scripts/install-paseo-fork`, after the chec
 ## Generated files
 
 ```text
-~/.codex-runtime/<role>/config.toml
-~/.codex-runtime/<role>/model-catalog.no-native-agents.json
-~/.codex-runtime/<role>/*.sqlite*
-~/.codex-runtime/<role>/sessions/
+~/.grok-runtime/<role>/config.toml
+~/.grok-runtime/<role>/agent-profile.md
+~/.grok-runtime/<role>/sessions/
 ```
 
-Never edit generated `config.toml` as the durable source. Change the base Codex config or role overlay, then run `scripts/sync-all`.
+Never edit generated `config.toml` or `agent-profile.md` as the durable source.
+Change the role overlay or sync template, then run `scripts/sync-all`.
 
 ## Private state
 
 Never commit:
 
-- `~/.codex/auth.json` or other Codex auth stores.
+- `~/.grok/auth.json`, copied role auth, or other provider auth stores.
 - Paseo daemon keypairs, push tokens, IDs, agent state, worktrees, uploads, logs or PID files.
 - Runtime sessions, logs, memories, queues or SQLite databases.
 - Backup directories.

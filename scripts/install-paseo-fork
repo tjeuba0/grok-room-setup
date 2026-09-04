@@ -5,12 +5,26 @@ source "$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/lib/common.sh"
 
 require_command git
 
-fork_url="${PASEO_FORK_URL:-git@github.com:hoangnb24/paseo.git}"
 upstream_url="${PASEO_UPSTREAM_URL:-git@github.com:getpaseo/paseo.git}"
-target="${PASEO_REPO_DIR:-$HOME/projects/supervisors/paseo}"
-branch="${PASEO_BRANCH:-main}"
+target="${PASEO_REPO_DIR:-$HOME/projects/supervisors/paseo-grok-room}"
+branch="${PASEO_BRANCH:-grok-room}"
+base_ref="${PASEO_BASE_REF:-origin/main}"
+live_checkout="${PASEO_LIVE_REFERENCE_DIR:-$HOME/projects/supervisors/paseo}"
 cli_entrypoint="${PASEO_CLI_ENTRYPOINT:-packages/cli/bin/paseo}"
 cli_link="${PASEO_CLI_LINK:-$HOME/.local/bin/paseo}"
+verified_commit="${PASEO_VERIFIED_COMMIT:-$(awk -F '"' '/^verified_commit = / { print $2; exit }' "$REPO_ROOT/paseo/source.toml")}"
+
+is_allowed_origin() {
+  [[ "$1" == "$upstream_url" || \
+     "$1" == "git@github.com:getpaseo/paseo.git" || \
+     "$1" == "https://github.com/getpaseo/paseo.git" ]]
+}
+
+is_verified_origin() {
+  [[ "$1" == "$upstream_url" || \
+     "$1" == "git@github.com:getpaseo/paseo.git" || \
+     "$1" == "https://github.com/getpaseo/paseo.git" ]]
+}
 
 if [[ -e "$target" && ! -d "$target/.git" ]]; then
   die "target exists but is not a Git checkout: $target"
@@ -18,24 +32,46 @@ fi
 
 if [[ ! -d "$target/.git" ]]; then
   mkdir -p "$(dirname "$target")"
-  log "CLONE  $fork_url -> $target"
-  git clone --branch "$branch" "$fork_url" "$target"
+  log "CLONE  $upstream_url -> $target"
+  git clone --origin origin "$upstream_url" "$target"
 else
   log "FOUND  $target"
 fi
 
-current_fork=$(git -C "$target" remote get-url hoangnb24 2>/dev/null || true)
-if [[ -z "$current_fork" ]]; then
-  git -C "$target" remote add hoangnb24 "$fork_url"
-elif [[ "$current_fork" != "$fork_url" ]]; then
-  warn "hoangnb24 remote differs: $current_fork"
+current_origin=$(git -C "$target" remote get-url origin 2>/dev/null || true)
+if [[ -z "$current_origin" ]]; then
+  git -C "$target" remote add origin "$upstream_url"
+  current_origin="$upstream_url"
+elif ! is_allowed_origin "$current_origin"; then
+  die "origin must be official getpaseo/paseo; found: $current_origin"
 fi
 
-current_upstream=$(git -C "$target" remote get-url origin 2>/dev/null || true)
-if [[ -z "$current_upstream" ]]; then
-  git -C "$target" remote add origin "$upstream_url"
-elif [[ "$current_upstream" != "$upstream_url" ]]; then
-  warn "origin remote differs: $current_upstream"
+git -C "$target" fetch origin
+
+if git -C "$target" show-ref --verify --quiet "refs/heads/$branch"; then
+  git -C "$target" switch "$branch"
+elif is_verified_origin "$current_origin"; then
+  git -C "$target" cat-file -e "${verified_commit}^{commit}" 2>/dev/null || \
+    die "verified Paseo commit is unavailable after fetch: $verified_commit"
+  git -C "$target" switch -c "$branch" "$verified_commit"
+  git -C "$target" branch --set-upstream-to="$base_ref" "$branch"
+else
+  git -C "$target" switch -c "$branch" --track "$base_ref"
+fi
+
+if is_verified_origin "$current_origin" && \
+   ! git -C "$target" merge-base --is-ancestor "$verified_commit" HEAD; then
+  die "branch $branch does not contain verified Paseo commit $verified_commit"
+fi
+
+if [[ -d "$live_checkout/.git" && "$live_checkout" != "$target" ]]; then
+  current_live=$(git -C "$target" remote get-url live-fork 2>/dev/null || true)
+  if [[ -z "$current_live" ]]; then
+    git -C "$target" remote add live-fork "$live_checkout"
+  elif [[ "$current_live" != "$live_checkout" ]]; then
+    warn "live-fork comparison remote differs: $current_live"
+  fi
+  git -C "$target" fetch live-fork main
 fi
 
 cli_target="$target/$cli_entrypoint"
@@ -57,7 +93,7 @@ else
   log "LINK  $cli_link -> $cli_target"
 fi
 
-log "PASEO_FORK_READY"
+log "PASEO_GROK_ROOM_READY"
 log "path=$target"
 log "branch=$(git -C "$target" branch --show-current)"
 log "commit=$(git -C "$target" rev-parse HEAD)"

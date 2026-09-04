@@ -16,25 +16,23 @@ check_command() {
   fi
 }
 
-for command_name in codex python3 git jq node npm; do
+for command_name in grok python3 git jq node npm; do
   check_command "$command_name"
 done
 
-if [[ -d "$HOME/.codex" ]]; then
-  log "OK    Codex home   $HOME/.codex"
+if [[ -d "$HOME/.grok" ]]; then
+  log "OK    Grok home    $HOME/.grok"
 else
-  log "FAIL  Codex home   $HOME/.codex is missing"
+  log "FAIL  Grok home    $HOME/.grok is missing"
   failures=$((failures + 1))
 fi
 
-for resource in config.toml auth.json AGENTS.md hooks.json skills plugins; do
-  if [[ -e "$HOME/.codex/$resource" ]]; then
-    log "OK    shared       ~/.codex/$resource"
-  else
-    log "WARN  shared       ~/.codex/$resource is missing; runtime sync will stop"
-    warnings=$((warnings + 1))
-  fi
-done
+if [[ -f "$HOME/.grok/auth.json" ]]; then
+  log "OK    Grok auth    ~/.grok/auth.json"
+else
+  log "FAIL  Grok auth    ~/.grok/auth.json is missing; authenticate Grok first"
+  failures=$((failures + 1))
+fi
 
 case ":$PATH:" in
   *":$HOME/.local/bin:"*) log "OK    PATH         ~/.local/bin" ;;
@@ -44,13 +42,20 @@ case ":$PATH:" in
     ;;
 esac
 
-paseo_checkout="${PASEO_REPO_DIR:-$HOME/projects/supervisors/paseo}"
+paseo_checkout="${PASEO_REPO_DIR:-$HOME/projects/supervisors/paseo-grok-room}"
 if [[ -d "$paseo_checkout/.git" ]]; then
-  log "OK    Paseo fork   $paseo_checkout"
+  log "OK    Paseo source $paseo_checkout"
   log "INFO  branch       $(git -C "$paseo_checkout" branch --show-current)"
   log "INFO  commit       $(git -C "$paseo_checkout" rev-parse --short HEAD)"
+  origin_url=$(git -C "$paseo_checkout" remote get-url origin 2>/dev/null || true)
+  if [[ "$origin_url" == "git@github.com:getpaseo/paseo.git" || "$origin_url" == "https://github.com/getpaseo/paseo.git" ]]; then
+    log "OK    upstream     $origin_url"
+  else
+    log "FAIL  upstream     expected getpaseo/paseo, found ${origin_url:-none}"
+    failures=$((failures + 1))
+  fi
 else
-  log "WARN  Paseo fork   not found at $paseo_checkout"
+  log "WARN  Paseo source official checkout not found at $paseo_checkout; run scripts/install-paseo-fork"
   warnings=$((warnings + 1))
 fi
 
@@ -59,4 +64,3 @@ if [[ "$failures" -gt 0 ]]; then
   die "$failures required check(s) failed; $warnings warning(s)"
 fi
 log "DOCTOR_OK: $warnings warning(s)"
-

@@ -1,7 +1,6 @@
 [verified]
-paseo = "0.4.0"
-codex_cli = "0.147.0"
+paseo = "0.7.2"
+grok_cli = "1.0.13"
 
 # Node and npm are intentionally not pinned here. Use the versions supported
 # by the fork's package.json/package manager metadata.
-
